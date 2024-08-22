@@ -38,3 +38,15 @@ autoinstall:
     layout:
       name: lvm
       password: lukspass
+  snaps:
+    - signal-desktop
+    - mattermost-desktop
+    - nextcloud-desktop-client
+  packages:
+    - pandoc
+    - texlive
+    - texlive-xetex
+    - inotify-tools
+    - csvkit
+    - ghostwriter
+    - meld
