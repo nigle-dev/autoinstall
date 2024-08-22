@@ -1,4 +1,3 @@
-#cloud-config
 autoinstall:
   version: 1
   #refresh-installer: # start with an up-to-date installer
