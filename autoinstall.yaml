@@ -37,11 +37,12 @@ autoinstall:
           size: largest
     layout:
       name: lvm
+      sizing-policy: all
       password: lukspass
   snaps:
-    - signal-desktop
-    - mattermost-desktop
-    - nextcloud-desktop-client
+    - name: signal-desktop
+    - name: mattermost-desktop
+    - name: nextcloud-desktop-client
   packages:
     - pandoc
     - texlive
