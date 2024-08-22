@@ -9,7 +9,6 @@ autoinstall:
   interactive-sections: # Install groups listed here will wait for user input
     - network
     - identity
-
   locale: en_US.UTF-8
   keyboard:
     layout: us
@@ -41,8 +40,6 @@ autoinstall:
       password: lukspass
   snaps:
     - name: signal-desktop
-    - name: mattermost-desktop
-    - name: nextcloud-desktop-client
   packages:
     - pandoc
     - texlive
