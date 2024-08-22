@@ -1,0 +1,217 @@
+autoinstall:
+  version: 1
+  refresh-installer: # start with an up-to-date installer
+  update: yes
+  channel: stable # update from the ubuntu stable branch only
+  interactive-sections: # Install groups listed here will wait for user input
+    - network
+    - identity
+
+  locale: en_US.UTF-8
+  keyboard:
+    layout: us
+  ssh:
+    allow-pw: false
+    install-server: false
+  storage:
+    grub:
+      update_nvram: true
+      remove_duplicate_entries: true
+      probe_additional_os: false
+      reorder_uefi: false
+    swap:
+      filename: swap.img
+      maxsize: 8GB
+    config:
+      # Disks
+      - id: disk0
+        type: disk
+        ptable: gpt
+        wipe: superblock
+        grub_device: false
+        match:
+          ssd: yes
+          size: largest
+      # Partitions
+      - id: bios
+        type: partition
+        device: disk0
+        size: 1MB
+        flag: bios_grub
+      - id: esp
+        type: partition
+        device: disk0
+        grub_device: true
+        size: 512MB
+        flag: boot
+      - id: boot
+        type: partition
+        device: disk0
+        size: 1GB
+      # LVM Physical Volumes and DM-CRYPT disk encryption
+      - id: pv
+        type: partition
+        device: disk0
+        size: -1
+      - id: client_encrypted
+        type: dm_crypt
+        preserve: false
+        key: 'SECRET_KEY'
+        volume: pv
+      # LVM Volume Groups and Partitions
+      - id: volumegroup
+        name: ubuntu-volumegroup
+        type: lvm_volgroup
+        devices: [client_encrypted]
+        preserve: false
+      - id: lv_root
+        name: root
+        volgroup: volumegroup
+        size: 100%
+        type: lvm_partition
+      # Filesystems
+      - id: esp_filesystem
+        type: format
+        volume: esp
+        fstype: fat32
+        label: EFI
+      - id: boot_filesystem
+        type: format
+        volume: boot
+        fstype: ext4
+      - id: root_filesystem
+        type: format
+        fstype: ext4
+        volume: lv_root
+      # Filesystem Mountpoints
+      - id: esp_mount
+        type: mount
+        device: esp_filesystem
+        path: /boot/efi
+      - id: boot_mount
+        type: mount
+        device: boot_filesystem
+        path: /boot
+      - id: root_mount
+        type: mount
+        device: root_filesystem
+        path: /
+
+  apt:
+    preserve_sources_list: false
+    primary:
+      - arches: [amd64, i386]
+        uri: http://us.archive.ubuntu.com/ubuntu
+      - arches: [default]
+        uri: http://ports.ubuntu.com/ubuntu-ports
+    conf: | # APT config
+      APT {
+        Get {
+          Assume-Yes "true";
+          Fix-Broken "true";
+        };
+      };
+    sources:
+      ignored1: # for yaml formatting. below adds graphics drivers ppa
+        source: ppa:graphics-drivers/ppa
+
+  snaps:
+    - name: slack
+      classic: true
+      channel: stable
+
+  packages:
+    - build-essential
+    - ubuntu-desktop
+    - dkms
+    # Zoom dependencies
+    - libgl1-mesa-glx
+    - libegl1-mesa
+    - libxcb-xtest0
+    - libxcb-xinerama0
+    # - wormhole for an easy to use encrypted file transfer
+    - wormhole
+    - emacs
+    #- Commented out desktop environments for future selection menu via grub
+    #- ubuntu-mate-desktop
+    #- xfce4
+    #- kde-full
+    - git
+    - libreoffice
+    # pavucontrol for bluetooth/pulseaudio
+    - pavucontrol
+    #- gnome-session - used for ubuntu-minimal-desktop
+    #- gdm3 - ubuntu-minimal-desktop
+    # ClamAV packages
+    - clamav
+    - clamtk
+    #- clamtk-gnome
+    - clamav-daemon
+    - clamav-docs
+    # - chrome & some dependencies for the user experience
+    - google-chrome-stable
+    - chromium-codecs-ffmpeg-extra
+    # Bluetooth dependencies
+    - bluez-btsco
+    - bluez-dbg
+    - bluez-hcidump
+    - bluez-tools
+    - libbluetooth3-dbg
+    # End of Bluetooth dependencies
+    # These packages are for adding a repo that requires https, in particular for Sublime Text which we install later
+    - dirmngr
+    - gnupg
+    - apt-transport-https
+    - ca-certificates
+    - software-properties-common
+    - sublime-text
+    # End https repo/sublime dependencies
+    # Uncomment for OEM kernel
+    #- linux-oem-20.04b
+
+  package_update: true
+  package_upgrade: true
+
+  late-commands:
+    # Transfer RHR wallpaper from USB to user backgrounds
+    # Changing from networkd to NetworkManager
+    # move existing config out of the way
+    - find /target/etc/netplan/ -name "*.yaml" -exec sh -c 'mv "$1" "$1-orig"' _ {} \;
+    # Create a new netplan and enable it
+    - |
+      cat <<EOF | sudo tee /target/etc/netplan/01-netcfg.yaml
+      network:
+        version: 2
+        renderer: NetworkManager
+      EOF
+    - curtin in-target --target /target netplan generate
+    - curtin in-target --target /target netplan apply
+    - curtin in-target --target /target systemctl enable NetworkManager.service
+    #- cp /target/cdrom/extras/desktop-wp.png /target/usr/share/backgrounds/
+
+  user-data: # Commands here run during first boot (cannot be interactive)
+    runcmd: # The script below will be dropped in /var/lib/cloud/instance/scripts/runcmd.sh and will be executed at first boot
+      - [apt-get, update]
+      - [apt-get, dist-upgrade, --yes]
+      # Install Google Chrome from the official repository setup earlier
+      - [apt, install, --assume-yes, google-chrome-stable]
+      # Make a directory for additional post-installers
+      - [mkdir, -p, /run/post-install/]
+      # Download & install Zoom
+      - [
+          wget,
+          'https://zoom.us/client/latest/zoom_amd64.deb',
+          -O,
+          /run/post-install/zoom_amd64.deb,
+        ]
+      - [dpkg, -i, /run/post-install/zoom_amd64.deb]
+      - [apt, --fix-broken, --assume-yes, install]
+      # Remove packages we don't need
+      - apt-get --assume-yes purge firefox thunderbird byobu
+      - apt autoremove --assume-yes
+      #- [ sudo, -u, ubuntu, dbus-launch, gsettings, set, org.gnome.desktop.background, picture-uri, file:///usr/share/backgrounds/desktop-wp.png]
+      - apt update
+      - apt install --assume-yes sublime-text
+      # Add chrome & sublime text to favorites (currently not working)
+      - gsettings set org.gnome.shell favorite-apps "$(gsettings get org.gnome.shell favorite-apps | sed s/.$//), 'google-chrome.desktop', 'sublime_text.desktop']"
+      - gsettings set org.gnome.shell.extensions.dash-to-dock click-action 'minimize'
