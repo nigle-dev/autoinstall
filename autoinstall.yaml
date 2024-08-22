@@ -50,3 +50,5 @@ autoinstall:
     - csvkit
     - ghostwriter
     - meld
+    - git
+    - ubuntu-restricted-extras
