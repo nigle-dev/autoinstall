@@ -38,13 +38,3 @@ autoinstall:
       name: lvm
       sizing-policy: all
       password: lukspass
-  packages:
-    - pandoc
-    - texlive
-    - texlive-xetex
-    - inotify-tools
-    - csvkit
-    - ghostwriter
-    - meld
-    - git
-    - ubuntu-restricted-extras
