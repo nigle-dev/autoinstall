@@ -34,7 +34,6 @@ autoinstall:
         wipe: superblock
         grub_device: false
         match:
-          ssd: no
           size: largest
       # Partitions
       - id: bios
